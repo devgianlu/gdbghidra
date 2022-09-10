@@ -36,6 +36,7 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
 import javax.swing.border.BevelBorder;
 import javax.swing.table.DefaultTableModel;
+
 import docking.ActionContext;
 import docking.WindowPosition;
 import docking.action.DockingAction;
@@ -49,129 +50,124 @@ import ghidra.framework.plugintool.ComponentProviderAdapter;
 import resources.Icons;
 
 public class GDBGhidraProvider extends ComponentProviderAdapter {
-	private JPanel panel;
-	private DockingAction action;
-	private DockingAction portAction;
-	private DockingAction stopAction;
-	private ProgramLocation currentLocation;
-	private GDBReceiver gdbReceiver;
-	private Program currentProgram;
-	private GDBGhidraPlugin plugin;
-	private Thread gdbReceiverThread = null;
-	private DefaultTableModel model = null;
-	private JLabel status = new JLabel();
-	private Address previousAddress;
-	private Color previousColor;
-	
-	
-	public GDBGhidraProvider(GDBGhidraPlugin plugin, String owner) {
-		super(plugin.getTool(), owner, owner);
-		this.model = new DefaultTableModel( new String[] {"register", "value"}, 0) {
-			@Override
-			public boolean isCellEditable(int row, int column) {
-				if(column == 0) {
-					return false;
-				}
-				return true;
-			}
-		};
-		this.plugin = plugin;
-		buildTable();
-		
-		this.gdbReceiver = new GDBReceiver(2305, plugin, model);
-		
-		createActions();
-		setWindowGroup("core.GDBGhidra");
-		setIntraGroupPosition(WindowPosition.RIGHT);
-	}
+    private JPanel panel;
+    private DockingAction action;
+    private DockingAction portAction;
+    private DockingAction stopAction;
+    private ProgramLocation currentLocation;
+    private GDBReceiver gdbReceiver;
+    private Program currentProgram;
+    private GDBGhidraPlugin plugin;
+    private Thread gdbReceiverThread = null;
+    private DefaultTableModel model = null;
+    private JLabel status = new JLabel();
+    private Address previousAddress;
+    private Color previousColor;
 
-	public void buildTable() {
-		panel = new JPanel(new BorderLayout());
-		var table = new GTable(this.model);
-		panel.add(new JScrollPane(table));
 
-		var statusPanel = new JPanel();
-		statusPanel.setBorder(new BevelBorder(BevelBorder.LOWERED));
-		panel.add(statusPanel, BorderLayout.SOUTH);
-		statusPanel.setLayout(new BoxLayout(statusPanel, BoxLayout.X_AXIS));
+    public GDBGhidraProvider(GDBGhidraPlugin plugin, String owner) {
+        super(plugin.getTool(), owner, owner);
+        this.model = new DefaultTableModel(new String[]{"register", "value"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column != 0;
+            }
+        };
+        this.plugin = plugin;
+        buildTable();
 
-		status.setText("stopped");
-		status.setHorizontalAlignment(SwingConstants.LEFT);
-		statusPanel.add(status);
-		
-		var a = new AbstractAction() {
-			public void actionPerformed(ActionEvent a) {
-				RegisterChangeListener l = (RegisterChangeListener)a.getSource();
-				if(l.getColumn() != 1) {
-					return;
-				}
-				gdbReceiver.ChangeRegister((String)table.getValueAt(l.getRow(), 0), (String)l.getNewValue());
-			}
-		};
-		
-		new RegisterChangeListener(table, a);
-		
-		setVisible(true);
-	}
-	
-	private void createActions() {		
-		action = new DockingAction("Run", getName()) {
+        this.gdbReceiver = new GDBReceiver(2305, plugin, model);
 
-			@Override
-			public void actionPerformed(ActionContext context) {
-				System.out.println("[GDBGhidra] Starting server on port " + gdbReceiver.getPort() + "\n");
-				gdbReceiverThread = new Thread(gdbReceiver);
-				gdbReceiverThread.start();
-				status.setText("running");
-			}
-		};
-		action.setToolBarData(new ToolBarData(Icons.REFRESH_ICON, null));
-		action.setEnabled(true);
-		action.markHelpUnnecessary();
-		dockingTool.addLocalAction(this, action);
-		
-		stopAction = new DockingAction("Stop", getName()) {
+        createActions();
+        setWindowGroup("core.GDBGhidra");
+        setIntraGroupPosition(WindowPosition.RIGHT);
+    }
 
-			@Override
-			public void actionPerformed(ActionContext context) {
-				System.out.println("[GDBGhidra] Stopping server\n");
-				gdbReceiver.stop();
-				try {
-					if(gdbReceiverThread != null && gdbReceiverThread.isAlive()) {
-						gdbReceiverThread.join(2000);
-					}
-					gdbReceiverThread = null;
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				gdbReceiverThread = null;
-				status.setText("stopped");
-			}
-		};
-		stopAction.setToolBarData(new ToolBarData(Icons.STOP_ICON, null));
-		stopAction.setEnabled(true);
-		stopAction.markHelpUnnecessary();
-		dockingTool.addLocalAction(this, stopAction);
+    public void buildTable() {
+        panel = new JPanel(new BorderLayout());
+        var table = new GTable(this.model);
+        panel.add(new JScrollPane(table));
 
-		portAction = new DockingAction("Configure", "Port") {
-			@Override
-			public void actionPerformed(ActionContext context) {
-				AskDialog<Integer> d = new AskDialog<>("Listener port configuration", "Please enter TCP listener port:", AskDialog.INT, gdbReceiver.getPort());
-				if(d.isCanceled()) {
-					// WAAAAH!
-				}
-				gdbReceiver.setPort( Integer.valueOf(d.getValueAsString()).intValue() );
-			}
-		};
-		portAction.setToolBarData(new ToolBarData(Icons.CONFIGURE_FILTER_ICON, null));
-		portAction.setEnabled(true);
-		portAction.markHelpUnnecessary();
-		dockingTool.addLocalAction(this, portAction);
-		
-		DeleteBreakpointAction deleteBreakpointAction = new DeleteBreakpointAction(this.plugin);
-		deleteBreakpointAction.setEnabled(true);
-		deleteBreakpointAction.setGDBReceiver(gdbReceiver);
-		dockingTool.addAction(deleteBreakpointAction);
+        var statusPanel = new JPanel();
+        statusPanel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        panel.add(statusPanel, BorderLayout.SOUTH);
+        statusPanel.setLayout(new BoxLayout(statusPanel, BoxLayout.X_AXIS));
+
+        status.setText("stopped");
+        status.setHorizontalAlignment(SwingConstants.LEFT);
+        statusPanel.add(status);
+
+        var a = new AbstractAction() {
+            public void actionPerformed(ActionEvent a) {
+                RegisterChangeListener l = (RegisterChangeListener) a.getSource();
+                if (l.getColumn() != 1) {
+                    return;
+                }
+                gdbReceiver.changeRegister((String) table.getValueAt(l.getRow(), 0), (String) l.getNewValue());
+            }
+        };
+
+        new RegisterChangeListener(table, a);
+
+        setVisible(true);
+    }
+
+    private void createActions() {
+        action = new DockingAction("Run", getName()) {
+            @Override
+            public void actionPerformed(ActionContext context) {
+                System.out.println("[GDBGhidra] starting server on port " + gdbReceiver.getPort() + "\n");
+                gdbReceiverThread = new Thread(gdbReceiver);
+                gdbReceiverThread.start();
+                status.setText("running");
+            }
+        };
+        action.setToolBarData(new ToolBarData(Icons.REFRESH_ICON, null));
+        action.setEnabled(true);
+        action.markHelpUnnecessary();
+        dockingTool.addLocalAction(this, action);
+
+        stopAction = new DockingAction("Stop", getName()) {
+            @Override
+            public void actionPerformed(ActionContext context) {
+                System.out.println("[GDBGhidra] stopping server\n");
+                gdbReceiver.stop();
+                try {
+                    if (gdbReceiverThread != null && gdbReceiverThread.isAlive()) {
+                        gdbReceiverThread.join(2000);
+                    }
+                    gdbReceiverThread = null;
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                gdbReceiverThread = null;
+                status.setText("stopped");
+            }
+        };
+        stopAction.setToolBarData(new ToolBarData(Icons.STOP_ICON, null));
+        stopAction.setEnabled(true);
+        stopAction.markHelpUnnecessary();
+        dockingTool.addLocalAction(this, stopAction);
+
+        portAction = new DockingAction("Configure", "Port") {
+            @Override
+            public void actionPerformed(ActionContext context) {
+                AskDialog<Integer> d = new AskDialog<>("Listener port configuration", "Please enter TCP listener port:", AskDialog.INT, gdbReceiver.getPort());
+                if (d.isCanceled()) {
+                    // WAAAAH!
+                }
+                gdbReceiver.setPort(Integer.valueOf(d.getValueAsString()));
+            }
+        };
+        portAction.setToolBarData(new ToolBarData(Icons.CONFIGURE_FILTER_ICON, null));
+        portAction.setEnabled(true);
+        portAction.markHelpUnnecessary();
+        dockingTool.addLocalAction(this, portAction);
+
+        DeleteBreakpointAction deleteBreakpointAction = new DeleteBreakpointAction(this.plugin);
+        deleteBreakpointAction.setEnabled(true);
+        deleteBreakpointAction.setGDBReceiver(gdbReceiver);
+        dockingTool.addAction(deleteBreakpointAction);
 		
 		/*
 		RestoreBreakpointsAction restoreBreakpointsAction = new RestoreBreakpointsAction(this.plugin);
@@ -179,40 +175,38 @@ public class GDBGhidraProvider extends ComponentProviderAdapter {
 		restoreBreakpointsAction.setEnabled(true);
 		restoreBreakpointsAction.setGDBReceiver(gdbReceiver);
 		dockingTool.addAction(restoreBreakpointsAction); */
-		
-		
-		ToggleBreakpointAction breakpointAction = new ToggleBreakpointAction(this.plugin);
-		breakpointAction.setEnabled(true);
-		breakpointAction.setGDBReceiver(gdbReceiver);
-		dockingTool.addAction(breakpointAction);
-		
-	}
 
-	@Override
-	public JComponent getComponent() {
-		return panel;
-	}
+        ToggleBreakpointAction breakpointAction = new ToggleBreakpointAction(this.plugin);
+        breakpointAction.setEnabled(true);
+        breakpointAction.setGDBReceiver(gdbReceiver);
+        dockingTool.addAction(breakpointAction);
+    }
 
-	public void locationChanged(Program cp, ProgramLocation loc) {
-		this.currentProgram = cp;
-		this.currentLocation = loc;		
-		
-		gdbReceiver.updateState(currentProgram, currentLocation);
-	}
+    @Override
+    public JComponent getComponent() {
+        return panel;
+    }
 
-	public void setPreviousAddress(Address newAddress) {
-		this.previousAddress = newAddress;
-	}
-	public Address getPreviousAddress() {
-		return this.previousAddress;
-	}
+    public void locationChanged(Program cp, ProgramLocation loc) {
+        this.currentProgram = cp;
+        this.currentLocation = loc;
 
-	public void setPreviousColor(Color previousColor) {
-		this.previousColor = previousColor;		
-	}
+        gdbReceiver.updateState(currentProgram, currentLocation);
+    }
 
-	public Color getPreviousColor() {
-		return this.previousColor;
-	}
-	
+    public void setPreviousAddress(Address newAddress) {
+        this.previousAddress = newAddress;
+    }
+
+    public Address getPreviousAddress() {
+        return this.previousAddress;
+    }
+
+    public void setPreviousColor(Color previousColor) {
+        this.previousColor = previousColor;
+    }
+
+    public Color getPreviousColor() {
+        return this.previousColor;
+    }
 }

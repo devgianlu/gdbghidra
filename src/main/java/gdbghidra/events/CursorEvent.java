@@ -38,27 +38,26 @@ public class CursorEvent implements Event {
 		this.address = address;
 		this.relocate = relocate;
 	}
-	
+
 	public String getAddressString() {
 		return this.address;
 	}
-	
+
 	public long getRelocationAddress() {
 		return Long.decode(relocate);
 	}
-	
+
 	public String getRelocationAddressString() {
 		return this.relocate;
 	}
-	
+
 	public long getOffset() {
-		if(relocate == "unknown") {
-			return Long.decode(address); 
-		}
-		
+		if (relocate.equals("unknown"))
+			return Long.decode(address);
+
 		return Long.decode(address) - Long.decode(relocate);
 	}
-	
+
 	@Override
 	public EventType getType() {
 		return EventType.CURSOR;
@@ -67,33 +66,30 @@ public class CursorEvent implements Event {
 	public static long handleEvent(CursorEvent cursor, Program currentProgram, GDBGhidraPlugin plugin) {
 		var newAddress = currentProgram.getImageBase().add(cursor.getOffset());
 		plugin.getTool().getService(GoToService.class).goTo(newAddress);
-		
+
 		var tx = currentProgram.startTransaction("change cursor color");
-		
+
 		/*==================== Begin Transaction ====================================*/
 		var service = plugin.getTool().getService(ColorizingService.class);
 		var currentColor = service.getBackgroundColor(newAddress);
-		
+
 		var previousAddress = plugin.getProvider().getPreviousAddress();
-		
+
 		service.setBackgroundColor(newAddress, newAddress, Color.GREEN);
-		
-		if(previousAddress != null ) {	
+
+		if (previousAddress != null)
 			service.setBackgroundColor(plugin.getProvider().getPreviousAddress(), plugin.getProvider().getPreviousAddress(), plugin.getProvider().getPreviousColor());
-		}
+
 		plugin.getProvider().setPreviousAddress(newAddress);
-		if(currentColor == null) {
-			plugin.getProvider().setPreviousColor(Color.WHITE);
-		}else {
-			plugin.getProvider().setPreviousColor(currentColor);
-		}
+		if (currentColor == null) plugin.getProvider().setPreviousColor(Color.WHITE);
+		else plugin.getProvider().setPreviousColor(currentColor);
+
 		/*==================== END Transaction ====================================*/
 		currentProgram.endTransaction(tx, true);
-		
-		
-		if(!cursor.getRelocationAddressString().equals("unknown")) {
+
+		if (!cursor.getRelocationAddressString().equals("unknown"))
 			return cursor.getRelocationAddress();
-		}
+
 		return 0;
 	}
 

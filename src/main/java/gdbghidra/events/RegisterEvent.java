@@ -36,74 +36,74 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.util.ProgramLocation;
 
 public class RegisterEvent implements Event {
-	private String name;
-	private String value;
-	private String address;
+    private String name;
+    private String value;
+    private String address;
 
-	public RegisterEvent(String address, String name, String value) {
-		this.address = address;
-		this.name = name;
-		this.value = value;
-	}
-	
-	public String getName() {
-		return this.name;
-	}
-	
-	public String getHexString() {
-		return this.value;
-	}
-	
-	public BigInteger getValue() {
-		if(this.value.startsWith("0x")) {
-			return new BigInteger(this.value.substring(2), 16);
-		}
-		return new BigInteger(this.value, 16);
+    public RegisterEvent(String address, String name, String value) {
+        this.address = address;
+        this.name = name;
+        this.value = value;
+    }
 
-	}
-	
-	public String getAddress() {
-		return this.address;
-	}
-	
-	@Override
-	public EventType getType() {
-		return EventType.REGISTER;
-	}
+    public String getName() {
+        return this.name;
+    }
 
-	public static void handleEvent(RegisterEvent registerEvent, Program currentProgram, ProgramPlugin plugin, ProgramLocation currentLocation) {
-		var register = currentProgram.getRegister(registerEvent.getName());
-		if(register == null) {
-			register = currentProgram.getRegister(registerEvent.getName().toUpperCase());
-			if(register == null) {
-				System.err.println("[GDBGHIDRA] Error unknown register: "+registerEvent.getName()+"\n");
-				return;
-			}
-		}
-		var address = currentLocation.getAddress();
-		var cmd = new CompoundCmd("Set Register Values");
-		var regCmd = new SetRegisterCmd(
-				register, 
-				address, 
-				address,
-				registerEvent.getValue());
-		cmd.add(regCmd);
-		plugin.getTool().execute(cmd, currentProgram);
-	}
+    public String getHexString() {
+        return this.value;
+    }
 
-	public static JSONObject constructJSONResponse(String register, String newValue, String action) {
-		var response = new JSONObject();
-		var datamap = new JSONObject();
-		var data = new JSONArray();
-		
-		response.put("type", "REGISTER");
-		datamap.put("register", register);
-		datamap.put("value", newValue);
-		datamap.put("action", action);
-		data.add(datamap);
-		response.put("data", data);
-		
-		return response;
-	}
+    public BigInteger getValue() {
+        if (this.value.startsWith("0x")) {
+            return new BigInteger(this.value.substring(2), 16);
+        }
+        return new BigInteger(this.value, 16);
+    }
+
+    public String getAddress() {
+        return this.address;
+    }
+
+    @Override
+    public EventType getType() {
+        return EventType.REGISTER;
+    }
+
+    public static void handleEvent(RegisterEvent registerEvent, Program currentProgram, ProgramPlugin plugin, ProgramLocation currentLocation) {
+        var register = currentProgram.getRegister(registerEvent.getName());
+        if (register == null) {
+            register = currentProgram.getRegister(registerEvent.getName().toUpperCase());
+            if (register == null) {
+                System.err.println("[GDBGhidra] Error unknown register: " + registerEvent.getName() + "\n");
+                return;
+            }
+        }
+
+        var address = currentLocation.getAddress();
+        var cmd = new CompoundCmd("Set Register Values");
+        var regCmd = new SetRegisterCmd(
+                register,
+                address,
+                address,
+                registerEvent.getValue());
+        cmd.add(regCmd);
+        plugin.getTool().execute(cmd, currentProgram);
+    }
+
+    public static JSONObject constructJSONResponse(String register, String newValue, String action) {
+        var response = new JSONObject();
+        var datamap = new JSONObject();
+        var data = new JSONArray();
+
+        response.put("type", "REGISTER");
+        datamap.put("register", register);
+        datamap.put("value", newValue);
+        datamap.put("action", action);
+        data.add(datamap);
+        response.put("data", data);
+
+        return response;
+    }
 
 }

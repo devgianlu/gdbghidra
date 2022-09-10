@@ -23,37 +23,55 @@ SOFTWARE.
  */
 package gdbghidra.events;
 
-public class HelloEvent implements Event{
-	private String architecture;
-	private Integer answerPort;
-	private String endianess;
-	private String answerIp;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 
-	public HelloEvent(String architecture, String endianess, String answerIp, String answerPort) {
-		this.architecture = architecture;
-		this.endianess = endianess;
-		this.answerIp = answerIp;
-		this.answerPort = Integer.valueOf(answerPort);
-	}
-	
-	public String getEndianess() {
-		return this.endianess;
-	}
-	
-	public String getAnswerIp() {
-		return this.answerIp;
-	}
-	
-	public Integer getAnswerPort() {
-		return this.answerPort;
-	}
-	
-	public String getArchitecture() {
-		return this.architecture;
-	}
+public class HelloEvent implements Event {
+    private String architecture;
+    private Integer answerPort;
+    private String endianess;
+    private String answerIp;
 
-	@Override
-	public EventType getType() {
-		return EventType.HELLO;
-	}
+    public HelloEvent(String architecture, String endianess, String answerIp, String answerPort) {
+        this.architecture = architecture;
+        this.endianess = endianess;
+        this.answerIp = answerIp;
+        this.answerPort = Integer.valueOf(answerPort);
+    }
+
+    public String getEndianess() {
+        return this.endianess;
+    }
+
+    public String getAnswerIp() {
+        return this.answerIp;
+    }
+
+    public Integer getAnswerPort() {
+        return this.answerPort;
+    }
+
+    public String getArchitecture() {
+        return this.architecture;
+    }
+
+    @Override
+    public EventType getType() {
+        return EventType.HELLO;
+    }
+
+    public static JSONObject constructJSONResponse(long relocate) {
+        var response = new JSONObject();
+        var datamap = new JSONObject();
+        var data = new JSONArray();
+
+        response.put("type", "HELLO");
+
+
+        datamap.put("relocate", relocate);
+        data.add(datamap);
+        response.put("data", data);
+
+        return response;
+    }
 }

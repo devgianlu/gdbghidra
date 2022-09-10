@@ -31,35 +31,36 @@ import ghidra.program.model.address.Address;
 import ghidra.program.util.MarkerLocation;
 
 class DeleteBreakpointAction extends DockingAction {
-	private GDBReceiver gdbReceiver;
+    private GDBReceiver gdbReceiver;
 
-	DeleteBreakpointAction(GDBGhidraPlugin pl) {
-		super("Delete Breakpoint", pl.getName());
-		setDescription("Delete breakpoint at current location");
-		setPopupMenuData(new MenuData(new String[] {"Delete breakpoint"}, null, "Breakpoint"));
-		this.gdbReceiver = null;
-	}
+    DeleteBreakpointAction(GDBGhidraPlugin pl) {
+        super("Delete Breakpoint", pl.getName());
+        setDescription("Delete breakpoint at current location");
+        setPopupMenuData(new MenuData(new String[]{"Delete breakpoint"}, null, "Breakpoint"));
+        validContextWhen(ctx -> MarkerLocation.class.isAssignableFrom(ctx.getContextObject().getClass()) || ctx instanceof ListingActionContext);
+        this.gdbReceiver = null;
+    }
 
-	@Override
-	public void actionPerformed(ActionContext context) {
-		Address address = getAddress(context);
-		if(this.gdbReceiver != null) {
-			this.gdbReceiver.deleteBreakpoint(address);
-		}
-	}
-	
-	public void setGDBReceiver(GDBReceiver gdbReceiver) {
-		this.gdbReceiver = gdbReceiver;
-	}
-	
-	private Address getAddress(ActionContext context) {
-		Object contextObject = context.getContextObject();
-		if(MarkerLocation.class.isAssignableFrom(contextObject.getClass())) {
-			return ((MarkerLocation) contextObject).getAddr();
-		} else if (context instanceof ListingActionContext ) {
-			return ((ListingActionContext) context).getAddress();
-		}
-		return null;
-	}
-	
+    @Override
+    public void actionPerformed(ActionContext context) {
+        Address address = getAddress(context);
+        if (this.gdbReceiver != null) {
+            this.gdbReceiver.deleteBreakpoint(address);
+        }
+    }
+
+    public void setGDBReceiver(GDBReceiver gdbReceiver) {
+        this.gdbReceiver = gdbReceiver;
+    }
+
+    private Address getAddress(ActionContext context) {
+        Object contextObject = context.getContextObject();
+        if (MarkerLocation.class.isAssignableFrom(contextObject.getClass())) {
+            return ((MarkerLocation) contextObject).getAddr();
+        } else if (context instanceof ListingActionContext) {
+            return ((ListingActionContext) context).getAddress();
+        }
+        return null;
+    }
+
 }

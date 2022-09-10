@@ -29,8 +29,8 @@ import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
 
 import ch.ethz.ssh2.crypto.Base64;
-import ghidra.app.util.MemoryBlockUtil;
-import ghidra.app.util.importer.MemoryConflictHandler;
+import ghidra.app.util.MemoryBlockUtils;
+import ghidra.app.util.importer.MessageLog;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.listing.Program;
@@ -95,35 +95,29 @@ public class MemoryEvent implements Event {
 		return this.size;
 	}
 
-	public static void handleEvent(MemoryEvent memEvent, Program currentProgram)  {
-		MemoryConflictHandler memoryConflictHandler = MemoryConflictHandler.ALWAYS_OVERWRITE;
-		MemoryBlockUtil mbu = new MemoryBlockUtil( currentProgram, memoryConflictHandler );
+	public static void handleEvent(MemoryEvent memEvent, Program currentProgram) {
+		MessageLog log = new MessageLog();
 		try {
 			var tx = currentProgram.startTransaction("adding memory");
-			
-			
-			var r = mbu.createInitializedBlock(
-					memEvent.getName(), 
-					memEvent.getAddress(currentProgram), 
-					memEvent.getData(), 
-					memEvent.getDataSize(), 
+
+			var r = MemoryBlockUtils.createInitializedBlock(
+					currentProgram,
+					false, // ??
+					memEvent.getName(),
+					memEvent.getAddress(currentProgram),
+					memEvent.getData(),
+					memEvent.getDataSize(),
 					"", // comment?
-					"gdb", 
-					memEvent.getReadPermission(), 
-					memEvent.getWritePermission(), 
-					memEvent.getExecutePermission(), 
+					"gdb",
+					memEvent.getReadPermission(),
+					memEvent.getWritePermission(),
+					memEvent.getExecutePermission(),
+					log,
 					TaskMonitor.DUMMY);
-			if(r == null) {
-				var msg = mbu.getMessages();
-				if(msg.contains("Overwrote memory")) {
-					System.out.println("[GDBGhidra] "+ mbu.getMessages());
-				} else {
-					System.err.println("[GDBGhidra] could not write new memory block: "+ mbu.getMessages());
-				}
-			} else {
-				System.out.println("[GDBGhidra]" + r.toString());
+			if (r != null) {
+				System.out.println("[GDBGhidra] " + r);
 			}
-			
+
 			currentProgram.endTransaction(tx, true);
 		} catch (AddressOverflowException e) {
 			e.printStackTrace();

@@ -47,8 +47,7 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Program;
 import ghidra.program.util.ProgramLocation;
 
-public class GDBReceiver implements Runnable{
-
+public class GDBReceiver implements Runnable {
 	private int port;
 	private GDBGhidraPlugin plugin;
 	private boolean stop;
@@ -59,108 +58,97 @@ public class GDBReceiver implements Runnable{
 	private ProgramLocation currentLocation;
 	private HashMap<String, BigInteger> registers;
 	private DefaultTableModel model;
-	
+
 	public GDBReceiver(int port, GDBGhidraPlugin plugin, DefaultTableModel model) {
 		this.port = port;
 		this.plugin = plugin;
 		this.stop = false;
 		this.helloEvent = null;
-		this.registers = new HashMap<String, BigInteger>();
+		this.registers = new HashMap<>();
 		this.model = model;
 	}
 
 	@Override
 	public void run() {
 		this.stop = false;
-		
-		try { 
+
+		try {
 			this.socket = new ServerSocket(port);
-			while(!this.stop) {
+			while (!this.stop) {
 				handleConnection(socket.accept());
 			}
-		} catch(SocketException e) {
-			if(!e.getMessage().contentEquals("Socket closed")) {
-				e.printStackTrace();	
-			}
+		} catch (SocketException e) {
+			if (!e.getMessage().contentEquals("Socket closed"))
+				e.printStackTrace();
+
 			this.stop = true;
-			return;
-		}catch (IOException|gdbghidra.events.ParseException e) {
+		} catch (IOException | gdbghidra.events.ParseException e) {
 			e.printStackTrace();
 			this.stop = true;
-			return;
 		}
-		
 	}
-	
+
 	private void handleConnection(Socket sock) throws IOException, gdbghidra.events.ParseException {
 		String msgBuffer;
-		try (
-				var is = sock.getInputStream();
-				var isr = new InputStreamReader(is);
-				var read = new BufferedReader(isr);
-				var os = sock.getOutputStream();
-		) {				
-			while(true) {
+		try (var is = sock.getInputStream();
+			 var isr = new InputStreamReader(is);
+			 var read = new BufferedReader(isr);
+			 var os = sock.getOutputStream()) {
+			while (!sock.isClosed()) {
 				msgBuffer = read.readLine();
-				if(msgBuffer == null || msgBuffer.length() == 0) {
+				if (msgBuffer == null || msgBuffer.length() == 0)
 					continue;
-				}
-				System.out.println("[GDBGhidra] received message: " + String.valueOf(msgBuffer.length()) + " bytes: '" + msgBuffer + "'\n");
+
+				System.out.println("[GDBGhidra] received message: " + msgBuffer.length() + " bytes: '" + msgBuffer + "'\n");
 
 				var tmpEvent = EventParser.fromJsonString(msgBuffer);
-				switch(tmpEvent.getType()) {
+				switch (tmpEvent.getType()) {
 					case HELLO:
-						var helloEvent = (HelloEvent)tmpEvent;
-						this.helloEvent = helloEvent;
+						this.helloEvent = (HelloEvent) tmpEvent;
+						sendResponse(HelloEvent.constructJSONResponse(currentProgram.getImageBase().getOffset()));
 						break;
 					case CURSOR:
-						var cursorEvent = (CursorEvent)tmpEvent;
+						var cursorEvent = (CursorEvent) tmpEvent;
 						this.relocate = CursorEvent.handleEvent(cursorEvent, currentProgram, this.plugin);
-						
 						break;
 					case REGISTER:
-						var registerEvent = (RegisterEvent)tmpEvent;
+						var registerEvent = (RegisterEvent) tmpEvent;
 						RegisterEvent.handleEvent(registerEvent, currentProgram, this.plugin, currentLocation);
 						updateTable(registerEvent);
-						
 						break;
 					case BREAKPOINT:
-						var breakpoint = (BreakpointEvent)tmpEvent;
+						var breakpoint = (BreakpointEvent) tmpEvent;
 						BreakpointEvent.handleEvent(breakpoint, currentProgram, this.plugin, this.relocate);
-						
 						break;
 					case MEMORY:
-						var memEvent = (MemoryEvent)tmpEvent;
+						var memEvent = (MemoryEvent) tmpEvent;
 						MemoryEvent.handleEvent(memEvent, currentProgram);
 						break;
-				}				
+				}
 			}
 		} catch (SocketTimeoutException e) {
 			return;
 		}
 	}
-	
+
 	private void updateTable(RegisterEvent registerEvent) {
 		var k = registerEvent.getName();
 		var v = registerEvent.getValue();
-		if(this.registers.containsKey(k)) {
-			this.registers.replace(k, v);
-		}else {
-			this.registers.put(k, v);
-		}
-		int i=0;
+		if (this.registers.containsKey(k)) this.registers.replace(k, v);
+		else this.registers.put(k, v);
+
 		boolean found = false;
-		for(i=0; i < this.model.getRowCount(); i++) {
-			String key = (String)this.model.getValueAt(i, 0);
-			if(key.contentEquals(registerEvent.getName())) {
-				this.model.setValueAt(registerEvent.getHexString(), i, 1);								
+		for (int i = 0; i < this.model.getRowCount(); i++) {
+			String key = (String) this.model.getValueAt(i, 0);
+			if (key.contentEquals(registerEvent.getName())) {
+				this.model.setValueAt(registerEvent.getHexString(), i, 1);
 				found = true;
 				break;
 			}
 		}
-		if(!found) {
-			this.model.addRow(new Object[] {registerEvent.getName(), registerEvent.getHexString()});
-		}		
+
+		if (!found)
+			this.model.addRow(new Object[]{registerEvent.getName(), registerEvent.getHexString()});
 	}
 
 	public void setPort(int port) {
@@ -169,12 +157,12 @@ public class GDBReceiver implements Runnable{
 
 	public void updateState(Program cp, ProgramLocation cl) {
 		this.currentProgram = cp;
-		this.currentLocation = cl;		
+		this.currentLocation = cl;
 	}
 
 	public void stop() {
 		this.stop = true;
-		if(this.socket != null) {
+		if (this.socket != null) {
 			try {
 				this.socket.close();
 			} catch (IOException e) {
@@ -186,23 +174,20 @@ public class GDBReceiver implements Runnable{
 	public int getPort() {
 		return this.port;
 	}
-	
+
 	public void addBreakpoint(Address address) {
-		if(this.helloEvent == null) {
+		if (this.helloEvent == null)
 			return;
-		}
-		
+
 		var response = BreakpointEvent.constructJSONResponse(this.relocate + address.subtract(currentProgram.getImageBase()), "toggle");
 		sendResponse(response);
 	}
 
 	public void sendResponse(JSONObject response) {
-		System.out.println("[GDBGhidra] sending message:\t"+response.toJSONString()+"\n");
-		
-		try(
-				var s = new Socket(this.helloEvent.getAnswerIp(), this.helloEvent.getAnswerPort());
-				var dos = new DataOutputStream(s.getOutputStream());
-				) {
+		System.out.println("[GDBGhidra] sending message:\t" + response.toJSONString() + "\n");
+
+		try (var s = new Socket(this.helloEvent.getAnswerIp(), this.helloEvent.getAnswerPort());
+			 var dos = new DataOutputStream(s.getOutputStream())) {
 			dos.write((response.toJSONString() + "\n").getBytes());
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -210,29 +195,28 @@ public class GDBReceiver implements Runnable{
 	}
 
 	public void deleteBreakpoint(Address address) {
-		if(this.helloEvent == null) {
+		if (this.helloEvent == null)
 			return;
-		}
-		
+
 		var response = BreakpointEvent.constructJSONResponse(this.relocate + address.subtract(currentProgram.getImageBase()), "delete");
 		sendResponse(response);
 	}
 
 	public void restoreBreakpoints() {
 		var it = currentProgram.getBookmarkManager().getBookmarksIterator("breakpoint");
-		while(it.hasNext()) {
+		while (it.hasNext()) {
 			var bm = it.next();
-			
+
 			var response = BreakpointEvent.constructJSONResponse(this.relocate + bm.getAddress().subtract(currentProgram.getImageBase()), "toggle");
-			sendResponse(response);	
-		}		
+			sendResponse(response);
+		}
 	}
 
-	public void ChangeRegister(String register, String newValue) {
-		if(this.helloEvent == null) {
+	public void changeRegister(String register, String newValue) {
+		if (this.helloEvent == null) {
 			return;
 		}
-		
+
 		var response = RegisterEvent.constructJSONResponse(register, newValue, "change");
 		sendResponse(response);
 	}

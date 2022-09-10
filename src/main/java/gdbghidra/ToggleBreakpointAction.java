@@ -31,36 +31,36 @@ import ghidra.program.model.address.Address;
 import ghidra.program.util.MarkerLocation;
 
 class ToggleBreakpointAction extends DockingAction {
-	private GDBReceiver gdbReceiver;
+    private GDBReceiver gdbReceiver;
 
-	ToggleBreakpointAction(GDBGhidraPlugin pl) {
-		super("Toggle Breakpoint", pl.getName());
-		setDescription("Enable/Disable breakpoint at current location");
-		setPopupMenuData(new MenuData(new String[] {"Toggle breakpoint"}, null, "Breakpoint"));
-		//setKeyBindingData(new KeyBindingData(KeyEvent.VK_B, InputEvent.CTRL_DOWN_MASK)); 
-		this.gdbReceiver = null;
-	}
+    ToggleBreakpointAction(GDBGhidraPlugin pl) {
+        super("Toggle Breakpoint", pl.getName());
+        setDescription("Enable/Disable breakpoint at current location");
+        setPopupMenuData(new MenuData(new String[]{"Toggle breakpoint"}, null, "Breakpoint"));
+        validContextWhen(ctx -> MarkerLocation.class.isAssignableFrom(ctx.getContextObject().getClass()) || ctx instanceof ListingActionContext);
+        this.gdbReceiver = null;
+    }
 
-	@Override
-	public void actionPerformed(ActionContext context) {
-		Address address = getAddress(context);
-		if(this.gdbReceiver != null) {
-			this.gdbReceiver.addBreakpoint(address);
-		}
-	}
-	
-	public void setGDBReceiver(GDBReceiver gdbReceiver) {
-		this.gdbReceiver = gdbReceiver;
-	}
-	
-	private Address getAddress(ActionContext context) {
-		Object contextObject = context.getContextObject();
-		if(MarkerLocation.class.isAssignableFrom(contextObject.getClass())) {
-			return ((MarkerLocation) contextObject).getAddr();
-		} else if (context instanceof ListingActionContext ) {
-			return ((ListingActionContext) context).getAddress();
-		}
-		return null;
-	}
-	
+    @Override
+    public void actionPerformed(ActionContext context) {
+        Address address = getAddress(context);
+        if (this.gdbReceiver != null) {
+            this.gdbReceiver.addBreakpoint(address);
+        }
+    }
+
+    public void setGDBReceiver(GDBReceiver gdbReceiver) {
+        this.gdbReceiver = gdbReceiver;
+    }
+
+    private Address getAddress(ActionContext context) {
+        Object contextObject = context.getContextObject();
+        if (MarkerLocation.class.isAssignableFrom(contextObject.getClass())) {
+            return ((MarkerLocation) contextObject).getAddr();
+        } else if (context instanceof ListingActionContext) {
+            return ((ListingActionContext) context).getAddress();
+        }
+        return null;
+    }
+
 }
